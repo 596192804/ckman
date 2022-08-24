@@ -3,10 +3,6 @@ package business
 import (
 	"database/sql"
 	"fmt"
-	"github.com/colinmarc/hdfs/v2"
-	"github.com/housepower/ckman/common"
-	"github.com/housepower/ckman/log"
-	"github.com/pkg/errors"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,6 +10,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/colinmarc/hdfs/v2"
+	"github.com/housepower/ckman/common"
+	"github.com/housepower/ckman/log"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -41,7 +42,6 @@ type ArchiveHDFS struct {
 	HdfsUser    string
 	HdfsDir     string
 	Parallelism int
-	Pool        *common.WorkerPool
 }
 
 var (
@@ -76,7 +76,6 @@ func (this *ArchiveHDFS) InitConns() (err error) {
 		}
 		_, err = common.ConnectClickHouse(host, this.Port, this.Database, this.User, this.Password)
 		if err != nil {
-			err = errors.Wrapf(err, "")
 			return
 		}
 		log.Logger.Infof("initialized clickhouse connection to %s", host)
@@ -215,7 +214,7 @@ func (this *ArchiveHDFS) Export(host, table string, slots []time.Time) {
 func (this *ArchiveHDFS) ExportSlot(host, table string, seq int, slotBeg, slotEnd time.Time) {
 	colName := pattInfo[table][0]
 	colType := pattInfo[table][1]
-	_ = this.Pool.Submit(func() {
+	_ = common.Pool.Submit(func() {
 		hdfsTbl := "hdfs_" + table + "_" + slotBeg.Format(SlotTimeFormat)
 		for _, dir := range hdfsDir {
 			fp := filepath.Join(dir, host+"_"+slotBeg.Format(SlotTimeFormat)+".parquet")
@@ -244,12 +243,11 @@ func (this *ArchiveHDFS) ExportSlot(host, table string, seq int, slotBeg, slotEn
 			log.Logger.Infof("host %s, table %s, slot %d, export done", host, table, seq)
 		}
 	})
-	this.Pool.Wait()
+	common.Pool.Wait()
 }
 
 func (this *ArchiveHDFS) ClearHDFS() error {
 	var err error
-	this.Pool = common.NewWorkerPool(this.Parallelism, len(this.Hosts))
 	ops := hdfs.ClientOptions{
 		Addresses: []string{this.HdfsAddr},
 		User:      this.HdfsUser,
@@ -320,7 +318,7 @@ func (this *ArchiveHDFS) ExportToHDFS() (err error) {
 	wg.Wait()
 	if atomic.LoadInt32(&cntErrors) != 0 {
 		log.Logger.Errorf("export failed")
-		return err
+		return errors.Wrap(err, "")
 	} else {
 		du := uint64(time.Since(t0).Seconds())
 		size := atomic.LoadUint64(&estSize)

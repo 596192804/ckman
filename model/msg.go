@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/gin-gonic/gin"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 var MsgFlags_zh = map[string]string{
@@ -56,8 +57,10 @@ var MsgFlags_zh = map[string]string{
 	GET_TABLE_LISTS_FAILED:      "获取数据库表信息失败",
 	GET_CK_OPEN_SESSIONS_FAIL:   "获取ClickHouse进行中的查询失败",
 	GET_CK_SLOW_SESSIONS_FAIL:   "获取ClickHouse慢查询失败",
+	KILL_CK_OPEN_SESSION_FAIL:   "终止正在进行中的查询失败",
 	GET_TASK_FAIL:               "获取任务失败",
 	DELETE_TASK_FAIL:            "删除任务失败",
+	STOP_TASK_FAIL:              "停止任务失败",
 	DEPLOY_CK_CLUSTER_ERROR:     "部署集群失败",
 	PING_CK_CLUSTER_FAIL:        "ClickHouse集群节点无法连接",
 	CLUSTER_NOT_EXIST:           "集群不存在",
@@ -65,6 +68,7 @@ var MsgFlags_zh = map[string]string{
 	ARCHIVE_TO_HDFS_FAIL:        "归档到HDFS失败",
 	SHOW_SCHEMA_ERROR:           "查看建表语句失败",
 	GET_SCHEMA_UI_FAILED:        "获取前端schema失败",
+	RESTORE_REPLICA_FAIL:        "恢复只读状态失败",
 
 	UNKNOWN: "unknown",
 }
@@ -120,8 +124,10 @@ var MsgFlags_en = map[string]string{
 	GET_TABLE_LISTS_FAILED:      "get table lists failed",
 	GET_CK_OPEN_SESSIONS_FAIL:   "get open sessions failed",
 	GET_CK_SLOW_SESSIONS_FAIL:   "get slow sessions failed",
+	KILL_CK_OPEN_SESSION_FAIL:   "kill open session failed",
 	GET_TASK_FAIL:               "get task infomation failed",
 	DELETE_TASK_FAIL:            "delete task failed",
+	STOP_TASK_FAIL:              "stop task failed",
 	DEPLOY_CK_CLUSTER_ERROR:     "deploy cluster failed",
 	PING_CK_CLUSTER_FAIL:        "ClickHouse cluster can't ping all nodes successfully",
 	CLUSTER_NOT_EXIST:           "Cluster does not exist",
@@ -129,6 +135,7 @@ var MsgFlags_en = map[string]string{
 	ARCHIVE_TO_HDFS_FAIL:        "archive to hdfs failed",
 	SHOW_SCHEMA_ERROR:           "show create table schemer failed",
 	GET_SCHEMA_UI_FAILED:        "ger ui schema fialed",
+	RESTORE_REPLICA_FAIL:        "restore replica failed",
 	UNKNOWN:                     "unknown",
 }
 

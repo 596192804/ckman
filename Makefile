@@ -10,8 +10,8 @@ DATE=$(shell date +%y%m%d)
 TIME=$(shell date --iso-8601=seconds 2>/dev/null)
 OS=$(shell uname)
 OSLOWER=$(shell uname | tr '[:upper:]' '[:lower:]')
-ARCH=$(shell uname -m)
-TARNAME=${PKGDIR}-${VERSION}-${DATE}.${OS}.$(ARCH).tar.gz
+GOARCH?=$(shell go env |grep GOARCH |cut -d\" -f2)
+TARNAME=${PKGDIR}-${VERSION}-${DATE}.${OS}.$(GOARCH).tar.gz
 TAG?=$(shell date +%y%m%d)
 LDFLAGS=-ldflags "-X main.BuildTimeStamp=${TIME} -X main.GitCommitHash=${REVISION} -X main.Version=${VERSION}"
 PUB_KEY=$(shell cat resources/eoi_public_key.pub 2>/dev/null)
@@ -19,9 +19,10 @@ export GOPROXY=https://goproxy.cn,direct
 
 .PHONY: frontend
 frontend:
-	rm -rf static/dist
+	rm -rf static/dist/*
 	make -C frontend build
-	cp -r frontend/dist static
+	cp -r frontend/dist static/
+	cp -r static/docs static/dist/
 
 .PHONY: backend
 backend:
@@ -41,8 +42,7 @@ pre:
 	go install github.com/swaggo/swag/cmd/swag@v1.7.1
 
 .PHONY: build
-build:pre
-	@test -d static/dist || (git submodule update --init --recursive && make frontend)
+build:pre frontend
 	pkger
 	swag init
 	go build ${LDFLAGS}
@@ -56,7 +56,7 @@ build:pre
 .PHONY: package
 package:build
 	@rm -rf ${PKGFULLDIR_TMP}
-	@mkdir -p ${PKGFULLDIR_TMP}/bin ${PKGFULLDIR_TMP}/conf ${PKGFULLDIR_TMP}/run ${PKGFULLDIR_TMP}/logs ${PKGFULLDIR_TMP}/package
+	@mkdir -p ${PKGFULLDIR_TMP}/bin ${PKGFULLDIR_TMP}/conf ${PKGFULLDIR_TMP}/run ${PKGFULLDIR_TMP}/logs ${PKGFULLDIR_TMP}/package ${PKGFULLDIR_TMP}/dbscript
 	@mv ${SHDIR}/ckman ${PKGFULLDIR_TMP}/bin
 	@mv ${SHDIR}/ckmanpasswd ${PKGFULLDIR_TMP}/bin
 	@mv ${SHDIR}/rebalancer ${PKGFULLDIR_TMP}/bin
@@ -71,6 +71,7 @@ package:build
 	@cp ${SHDIR}/resources/password ${PKGFULLDIR_TMP}/conf/password
 	@cp ${SHDIR}/resources/server.key ${PKGFULLDIR_TMP}/conf/server.key
 	@cp ${SHDIR}/resources/server.crt ${PKGFULLDIR_TMP}/conf/server.crt
+	@cp ${SHDIR}/resources/postgres.sql ${PKGFULLDIR_TMP}/dbscript/postgres.sql
 	@cp ${SHDIR}/README.md ${PKGFULLDIR_TMP}
 	@test ! -f resources/eoi_public_key.pub || (sed -i "s|#public_key:|${PUB_KEY}|" ${PKGFULLDIR_TMP}/conf/ckman.yaml)
 	@mv ${PKGFULLDIR_TMP} ${PKGFULLDIR}
@@ -89,15 +90,11 @@ docker-sh:
 
 .PHONY: rpm
 rpm:build
-	@sed "s/trunk/${VERSION}/g" nfpm.yaml > nfpm_${VERSION}.yaml
-	nfpm -f nfpm_${VERSION}.yaml pkg --packager rpm --target .
-	@rm nfpm_${VERSION}.yaml
+	 VERSION=${VERSION} nfpm -f nfpm.yaml pkg --packager rpm --target .
 
 .PHONY: deb
 deb:build
-	@sed "s/trunk/${VERSION}/g" nfpm.yaml > nfpm_${VERSION}.yaml
-	nfpm -f nfpm_${VERSION}.yaml pkg --packager deb --target .
-	@rm nfpm_${VERSION}.yaml
+	 VERSION=${VERSION} nfpm -f nfpm.yaml pkg --packager deb --target .
 
 .PHONY: test-ci
 test-ci:package
@@ -120,8 +117,12 @@ docker-image:build
 .PHONY: release
 release:
 	make docker-image VERSION=${VERSION}
-	make rpm VERSION=${VERSION}
+	make rpm
+	make deb
 	make package VERSION=${VERSION}
+	make rpm GOARCH=arm64
+	make deb GOARCH=arm64
+	make package VERSION=${VERSION} GOARCH=arm64
 	docker push quay.io/housepower/ckman:${VERSION}
 	docker push quay.io/housepower/ckman:latest
 

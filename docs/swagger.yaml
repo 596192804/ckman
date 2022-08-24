@@ -35,12 +35,10 @@ definitions:
       name:
         example: test_table
         type: string
-      ttl:
+      rename:
         items:
-          $ref: '#/definitions/model.CkTableTTL'
+          $ref: '#/definitions/model.CkTableRename'
         type: array
-      ttl_type:
-        type: string
     type: object
   model.ArchiveTableReq:
     properties:
@@ -85,6 +83,13 @@ definitions:
       cluster:
         example: test
         type: string
+      cwd:
+        example: /home/eoi/clickhouse
+        type: string
+      expert:
+        additionalProperties:
+          type: string
+        type: object
       hosts:
         example:
         - 192.168.0.1
@@ -100,13 +105,17 @@ definitions:
       logic_cluster:
         example: logic_test
         type: string
-      mergeTreeConf:
-        $ref: '#/definitions/model.MergeTreeConf'
       password:
         example: "123456"
         type: string
       path:
         example: /var/lib/
+        type: string
+      pkgName:
+        example: clickhouse-common-static-22.3.3.44.noarch.rpm
+        type: string
+      pkgType:
+        example: x86_64.rpm
         type: string
       port:
         example: 9000
@@ -220,7 +229,11 @@ definitions:
         example: age
         type: string
       options:
-        description: example:["DEFAULT now()", "CODEC(NONE)"]
+        example:
+        - DEFAULT now()
+        - CODEC(NONE)
+        - COMMENT
+        - 年龄
         items:
           type: string
         type: array
@@ -241,23 +254,37 @@ definitions:
         example: 0
         type: integer
     type: object
+  model.CkTableRename:
+    properties:
+      from:
+        example: col_old
+        type: string
+      to:
+        example: col_new
+        type: string
+    type: object
   model.CkTableTTL:
     properties:
       action:
+        example: toVolume
         type: string
       interval:
+        example: 3
         type: integer
       target:
+        example: main
         type: string
       time_column:
+        example: _timestamp
         type: string
       unit:
+        example: MONTH
         type: string
     type: object
   model.CkUpgradeCkReq:
     properties:
       packageVersion:
-        example: 20.9.3.45
+        example: 22.3.6.5
         type: string
       policy:
         example: Rolling
@@ -273,6 +300,9 @@ definitions:
         type: string
       distinct:
         example: true
+        type: boolean
+      dryrun:
+        example: false
         type: boolean
       fields:
         items:
@@ -290,6 +320,7 @@ definitions:
       partition:
         $ref: '#/definitions/model.CkTablePartition'
       storage_policy:
+        example: external
         type: string
       ttl:
         items:
@@ -322,6 +353,18 @@ definitions:
         example: test_table
         type: string
     type: object
+  model.GetLogReq:
+    properties:
+      lines:
+        example: 1000
+        type: integer
+      logType:
+        example: normal
+        type: string
+      tail:
+        example: true
+        type: boolean
+    type: object
   model.LoginReq:
     properties:
       password:
@@ -331,18 +374,8 @@ definitions:
         example: ckman
         type: string
     type: object
-  model.MergeTreeConf:
-    properties:
-      expert:
-        additionalProperties:
-          type: string
-        type: object
-    type: object
   model.PingClusterReq:
     properties:
-      database:
-        example: default
-        type: string
       password:
         example: "123456"
         type: string
@@ -475,7 +508,8 @@ paths:
       description: Get ClickHouse cluster
       responses:
         "200":
-          description: '{"retCode":"0000","retMsg":"ok", "entity":{"test":{"mode":"import","hosts":["192.168.0.1","192.168.0.2","192.168.0.3","192.168.0.4"],"names":["node1","node2","node3","node4"],"port":9000,"httpPort":8123,"user":"ck","password":"123456","database":"default","cluster":"test","zkNodes":["192.168.0.1","192.168.0.2","192.168.0.3"],"zkPort":2181,"zkStatusPort":8080,"isReplica":true,"version":"20.8.5.45","sshUser":"","sshPassword":"","shards":[{"replicas":[{"ip":"192.168.0.1","hostname":"node1"},{"ip":"192.168.0.2","hostname":"node2"}]},{"replicas":[{"ip":"192.168.0.3","hostname":"node3"},{"ip":"192.168.0.4","hostname":"node4"}]}],"path":""}}}'
+          description: '{"retCode":"5065","retMsg":"get ClickHouse cluster information
+            failed","entity":null}'
           schema:
             type: string
       security:
@@ -510,7 +544,7 @@ paths:
         type: string
       responses:
         "200":
-          description: '{"retCode":"0000","retMsg":"ok","entity":null}'
+          description: '{"retCode":"5045","retMsg":"delete cluster failed","entity":""}'
           schema:
             type: string
       security:
@@ -722,6 +756,34 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add ClickHouse node
+  /api/v1/ck/node/log/{clusterName}:
+    post:
+      description: Get ClickHouse Log
+      parameters:
+      - default: test
+        description: cluster name
+        in: path
+        name: clusterName
+        required: true
+        type: string
+      - description: request body
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/model.GetLogReq'
+      - description: password
+        in: query
+        name: password
+        type: string
+      responses:
+        "200":
+          description: '{"retCode":"0000","retMsg":"success","entity":null}'
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: GetLog
   /api/v1/ck/node/start/{clusterName}:
     put:
       description: Start ClickHouse node
@@ -790,6 +852,47 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get open sessions
+    put:
+      description: Kill open sessions
+      parameters:
+      - default: test
+        description: cluster name
+        in: path
+        name: clusterName
+        required: true
+        type: string
+      - default: "10"
+        description: sessions limit
+        in: query
+        name: limit
+        type: string
+      responses:
+        "200":
+          description: '{"retCode":"0000","retMsg":"ok","entity":[{"startTime":1609997894,"queryDuration":1,"query":"SELECT
+            DISTINCT name FROM system.tables","user":"eoi","queryId":"62dce71d-9294-4e47-9d9b-cf298f73233d","address":"192.168.21.73","threads":2}]}'
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Kill open sessions
+  /api/v1/ck/partition/{clusterName}:
+    get:
+      description: get partition infomation
+      parameters:
+      - default: test
+        description: cluster name
+        in: path
+        name: clusterName
+        required: true
+        type: string
+      responses:
+        "200":
+          description: '{"retCode":"0000","retMsg":"ok","entity":""}'
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: GetPartitions
   /api/v1/ck/ping/{clusterName}:
     post:
       description: check clickhousr server in cluster wether useful
@@ -1114,6 +1217,48 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Alter Table
+  /api/v1/ck/table/readoly/{clusterName}:
+    put:
+      description: restore replica to  recover readonly
+      parameters:
+      - default: test
+        description: cluster name
+        in: path
+        name: clusterName
+        required: true
+        type: string
+      responses:
+        "200":
+          description: '{"retCode":"5003","retMsg":"alter ClickHouse table failed","entity":""}'
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: RestoreReplica
+  /api/v1/ck/table/ttl/{clusterName}:
+    put:
+      description: Alter Tables TTL
+      parameters:
+      - default: test
+        description: cluster name
+        in: path
+        name: clusterName
+        required: true
+        type: string
+      - description: request body
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/model.AlterCkTableReq'
+      responses:
+        "200":
+          description: '{"retCode":"5003","retMsg":"alter ClickHouse table failed","entity":""}'
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: AlterTableTTL
   /api/v1/ck/table_lists/{clusterName}:
     get:
       description: get table lists config
@@ -1154,12 +1299,6 @@ paths:
     get:
       description: show create table
       parameters:
-      - description: request body
-        in: body
-        name: req
-        required: true
-        schema:
-          $ref: '#/definitions/model.ArchiveTableReq'
       - default: test
         description: cluster name
         in: path
@@ -1299,10 +1438,16 @@ paths:
     delete:
       description: Delete package
       parameters:
-      - default: 20.8.5.45
+      - default: 22.3.9.19
         description: package version
         in: query
         name: packageVersion
+        required: true
+        type: string
+      - default: x86_64.rpm
+        description: package type
+        in: query
+        name: pkgType
         required: true
         type: string
       responses:
@@ -1315,9 +1460,16 @@ paths:
       summary: Delete package
     get:
       description: Get package list
+      parameters:
+      - default: all
+        description: pkgType
+        in: query
+        name: pkgType
+        required: true
+        type: string
       responses:
         "200":
-          description: '{"retCode":"0000","retMsg":"ok","entity":["20.8.5.45"]}'
+          description: '{"retCode":"0000","retMsg":"ok","entity":[{"version":"22.3.9.19","pkgType":"x86_64.rpm","pkgName":"clickhouse-common-static-22.3.9.19.x86_64.rpm"}]}'
           schema:
             type: string
       security:
@@ -1343,19 +1495,10 @@ paths:
       summary: Upload package
   /api/v1/task/{taskId}:
     delete:
-      description: Get running task count
-      responses:
-        "200":
-          description: '{"retCode":"0000","retMsg":"success","entity":3}'
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: GetRunningTaskCount
-    get:
-      description: Get task by taskId
+      description: delete task by taskid
       parameters:
-      - description: task id
+      - default: 608e9e83-715e-7448-a149-9bef33f38cfe
+        description: taskId
         in: query
         name: taskId
         required: true
@@ -1367,13 +1510,47 @@ paths:
             type: string
       security:
       - ApiKeyAuth: []
+      summary: DeleteTask
+    get:
+      description: Get task by taskId
+      parameters:
+      - default: 608e9e83-715e-7448-a149-9bef33f38cfe
+        description: task id
+        in: query
+        name: taskId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: '{"retCode":"0000","retMsg":"success","entity":{\"TaskId\":\"608e9e83-715e-7448-a149-9bef33f38cfe\",\"ClusterName\":\"usertest\",\"Type\":\"clickhouse\",\"Option\":{\"ZH\":\"升级集群\",\"EN\":\"Upgrade\"},\"NodeStatus\":[{\"Host\":\"192.168.110.10\",\"Status\":{\"ZH\":\"上传安装包\",\"EN\":\"Prepare\"}},{\"Host\":\"192.168.110.12\",\"Status\":{\"ZH\":\"上传安装包\",\"EN\":\"Prepare\"}},{\"Host\":\"192.168.110.14\",\"Status\":{\"ZH\":\"上传安装包\",\"EN\":\"Prepare\"}}]}}'
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
       summary: GetTaskById
+    put:
+      description: stop task by taskid
+      parameters:
+      - default: 608e9e83-715e-7448-a149-9bef33f38cfe
+        description: taskId
+        in: query
+        name: taskId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: '{"retCode":"0000","retMsg":"success","entity":nil}'
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: StopTask
   /api/v1/task/lists:
     get:
       description: Get all tasklist
       responses:
         "200":
-          description: '{"retCode":"0000","retMsg":"success","entity":nil}'
+          description: '{"retCode":"0000","retMsg":"success","entity":[{\"TaskId\":\"608e9e83-715e-7448-a149-9bef33f38cfe\",\"ClusterName\":\"usertest\",\"Type\":\"clickhouse\",\"Option\":{\"ZH\":\"升级集群\",\"EN\":\"Upgrade\"},\"Status\":\"Success\",\"Message\":\"Success\",\"CreateTime\":\"2022-08-15T10:38:52.319504494+08:00\",\"UpdateTime\":\"2022-08-15T10:39:22.177215927+08:00\",\"Duration\":\"29s\"},{\"TaskId\":\"c6ee8843-36ba-4c88-94dd-0f226cdf8377\",\"ClusterName\":\"abc\",\"Type\":\"clickhouse\",\"Option\":{\"ZH\":\"设置集群\",\"EN\":\"Setting\"},\"Status\":\"Success\",\"Message\":\"Success\",\"CreateTime\":\"2022-08-09T14:28:00.697211511+08:00\",\"UpdateTime\":\"2022-08-09T14:28:59.887673161+08:00\",\"Duration\":\"59s\"}]}'
           schema:
             type: string
       security:
@@ -1393,9 +1570,16 @@ paths:
   /api/v1/ui/schema:
     get:
       description: Get ui schema
+      parameters:
+      - default: deploy
+        description: type
+        in: query
+        name: type
+        required: true
+        type: string
       responses:
         "200":
-          description: OK
+          description: '{"retCode":"5206","retMsg":"get schema ui failed","entity":nil}'
           schema:
             type: string
       security:
@@ -1442,8 +1626,7 @@ paths:
         type: string
       responses:
         "200":
-          description: '{"retCode":"0000","retMsg":"ok","entity":[{"host":"192.168.102.116","version":"3.6.2","server_state":"follower","peer_state":"following
-            - broadcast","avg_latency":0.4929,"approximate_data_size":141979,"znode_count":926}]}'
+          description: '{"retCode":"5080","retMsg":"get zk status fail","entity":null}'
           schema:
             type: string
       security:

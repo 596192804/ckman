@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/pkg/errors"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -14,6 +15,7 @@ const (
 	TaskStatusRunning int = 1
 	TaskStatusSuccess int = 2
 	TaskStatusFailed  int = 3
+	TaskStatusStopped int = 4
 
 	TaskTypeCKDeploy     string = "clickhouse.deploy"
 	TaskTypeCKUpgrade    string = "clickhouse.upgrade"
@@ -33,6 +35,7 @@ var TaskStatusMap = map[int]string{
 	TaskStatusRunning: "Running",
 	TaskStatusSuccess: "Success",
 	TaskStatusFailed:  "Failed",
+	TaskStatusStopped: "Stopped",
 }
 
 type Internationalization struct {
@@ -116,3 +119,13 @@ type TaskResp struct {
 	UpdateTime  time.Time
 	Duration    string
 }
+
+type TaskResps []TaskResp
+
+func SortResps(v1, v2 TaskResp) bool {
+	return v1.UpdateTime.After(v2.UpdateTime)
+}
+
+func (v TaskResps) Len() int           { return len(v) }
+func (v TaskResps) Swap(i, j int)      { v[i], v[j] = v[j], v[i] }
+func (v TaskResps) Less(i, j int) bool { return SortResps(v[i], v[j]) }

@@ -45,7 +45,7 @@ func GetCreateReplicaObjects(db *sql.DB, host, user, password string) (names, st
 			database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
 		FROM system.tables
-		WHERE database != 'system'
+		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
 		SETTINGS skip_unavailable_shards = 1`,
 		"system.tables", system_tables,
 	))
@@ -54,7 +54,8 @@ func GetCreateReplicaObjects(db *sql.DB, host, user, password string) (names, st
 			name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM system.tables
-		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner%'
+		WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA') 
+        AND create_table_query != '' AND name NOT LIKE '.inner%'
 		ORDER BY if(engine='Distributed', 1, 0), if(match(create_table_query, 'CREATE (MATERIALIZED )?VIEW'), 1, 0), name
 		SETTINGS skip_unavailable_shards = 1`,
 		"system.tables",
@@ -63,12 +64,10 @@ func GetCreateReplicaObjects(db *sql.DB, host, user, password string) (names, st
 
 	names1, statements1, err := GetObjectListFromClickHouse(db, sqlDBs)
 	if err != nil {
-		err = errors.Wrapf(err, "")
 		return
 	}
 	names2, statements2, err := GetObjectListFromClickHouse(db, sqlTables)
 	if err != nil {
-		err = errors.Wrapf(err, "")
 		return
 	}
 	names = append(names1, names2...)
@@ -114,7 +113,7 @@ INNER JOIN
 	log.Logger.Debugf("query:%s", query)
 	rows, err := db.Query(query)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "")
 	}
 
 	defer rows.Close()
@@ -143,7 +142,7 @@ INNER JOIN
 			"clusterName": clusterName,
 			"logictbl":    logictbl,
 		}
-		if err := common.ReplaceTemplateString(&localsql, replaceTmpl); err != nil {
+		if err = common.ReplaceTemplateString(&localsql, replaceTmpl); err != nil {
 			return nil, err
 		}
 		localsqls = append(localsqls, localsql)
@@ -152,7 +151,7 @@ INNER JOIN
 			database, localtbl, clusterName, database, localtbl, clusterName, database, localtbl)
 		distsqls = append(distsqls, distsql)
 
-		if err := common.ReplaceTemplateString(&logicsql, replaceTmpl); err != nil {
+		if err = common.ReplaceTemplateString(&logicsql, replaceTmpl); err != nil {
 			return nil, err
 		}
 		logicsqls = append(logicsqls, logicsql)

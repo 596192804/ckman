@@ -22,16 +22,17 @@ type CreateCkTableReq struct {
 	Partition     CkTablePartition  `json:"partition"`
 	Distinct      bool              `json:"distinct" example:"true"`
 	TTL           []CkTableTTL      `json:"ttl"`
-	StoragePolicy string            `json:"storage_policy"`
+	StoragePolicy string            `json:"storage_policy" example:"external"`
+	DryRun        bool              `json:"dryrun" example:"false"`
 }
 
 //https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#mergetree-table-ttl
 type CkTableTTL struct {
-	TimeCloumn string `json:"time_column"`
-	Interval   int    `json:"interval"`
-	Unit       string `json:"unit"`
-	Action     string `json:"action"`
-	Target     string `json:"target"`
+	TimeCloumn string `json:"time_column" example:"_timestamp"`
+	Interval   int    `json:"interval" example:"3"`
+	Unit       string `json:"unit" example:"MONTH"`
+	Action     string `json:"action" example:"toVolume"`
+	Target     string `json:"target" example:"main"`
 }
 
 type DistLogicTableReq struct {
@@ -94,18 +95,21 @@ type DistLogicTblParams struct {
 type CkTableNameTypeAfter struct {
 	Name    string   `json:"name" example:"age"`
 	Type    string   `json:"type" example:"Int32"`
-	Options []string `json:"options"` //example:["DEFAULT now()", "CODEC(NONE)"]
+	Options []string `json:"options" example:"DEFAULT now(),CODEC(NONE),COMMENT,年龄"`
 	After   string   `json:"after" example:"_timestamp"`
 }
 
+type CkTableRename struct {
+	From string `json:"from" example:"col_old"`
+	To   string `json:"to" example:"col_new"`
+}
 type AlterCkTableReq struct {
-	Name    string                 `json:"name" example:"test_table"`
-	DB      string                 `json:"database" example:"default"`
-	Add     []CkTableNameTypeAfter `json:"add"`
-	Modify  []CkTableNameType      `json:"modify"`
-	Drop    []string               `json:"drop" example:"age"`
-	TTLType string                 `json:"ttl_type"`
-	TTL     []CkTableTTL           `json:"ttl"`
+	Name   string                 `json:"name" example:"test_table"`
+	DB     string                 `json:"database" example:"default"`
+	Add    []CkTableNameTypeAfter `json:"add"`
+	Modify []CkTableNameType      `json:"modify"`
+	Drop   []string               `json:"drop" example:"age"`
+	Rename []CkTableRename        `json:"rename"`
 }
 
 type AlterCkTableParams struct {
@@ -115,8 +119,17 @@ type AlterCkTableParams struct {
 	Add     []CkTableNameTypeAfter
 	Drop    []string
 	Modify  []CkTableNameType
-	TTLType string
-	TTLExpr string
+	Rename  []CkTableRename
+}
+
+type AlterTblsTTLReq struct {
+	Tables []struct {
+		Database  string `json:"database" example:"default"`
+		TableName string `json:"tableName" example:"t1"`
+	} `json:"tables"`
+	TTLType string       `json:"ttl_type" example:"MODIFY"`
+	TTL     []CkTableTTL `json:"ttl"`
+	TTLExpr string       `json:"-"`
 }
 
 type DescCkTableParams struct {
@@ -147,6 +160,17 @@ type CkTableMetrics struct {
 	QueryCost        CkTableCost `json:"queryCost"`
 }
 
+type PartitionInfo struct {
+	Database     string    `json:"database"`
+	Table        string    `json:"table"`
+	Rows         uint64    `json:"rows"`
+	Compressed   uint64    `json:"compressed"`
+	UnCompressed uint64    `json:"uncompressed"`
+	MinTime      time.Time `json:"min_time"`
+	MaxTime      time.Time `json:"max_time"`
+	DiskName     string    `json:"disk_name"`
+}
+
 type CkTableCost struct {
 	Middle       float64 `json:"middle"`
 	SecondaryMax float64 `json:"secondaryMax"`
@@ -154,7 +178,7 @@ type CkTableCost struct {
 }
 
 type CkUpgradeCkReq struct {
-	PackageVersion  string `json:"packageVersion" example:"20.9.3.45"`
+	PackageVersion  string `json:"packageVersion" example:"22.3.6.5"`
 	Policy          string `json:"policy" example:"Rolling"`
 	SkipSameVersion bool   `json:"skip" example:"true"`
 }

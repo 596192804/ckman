@@ -1,25 +1,26 @@
 package common
 
 import (
-	"github.com/pkg/errors"
 	"math"
 	"net"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
-func ParseHosts(hosts []string)([]string, error) {
+func ParseHosts(hosts []string) ([]string, error) {
 	var allHosts []string
-	for _, host := range hosts{
+	for _, host := range hosts {
 		ips, err := ParseIPRange(host)
 		if err != nil {
 			return allHosts, err
 		}
 		allHosts = append(allHosts, ips...)
 	}
-	return  allHosts, nil
+	return allHosts, nil
 }
 
-func ParseIPRange(s string)([]string, error){
+func ParseIPRange(s string) ([]string, error) {
 	var ips []string
 	var err error
 	if strings.Contains(s, "-") {
@@ -63,7 +64,7 @@ func InetNtoA(i uint) (string, error) {
 	return ip.String(), nil
 }
 
-func ipRangeParse(s string)([]string, error) {
+func ipRangeParse(s string) ([]string, error) {
 	var ips []string
 	ipAddrs := strings.Split(s, "-")
 	if len(ipAddrs) != 2 {
@@ -92,11 +93,10 @@ func ipRangeParse(s string)([]string, error) {
 	return ips, nil
 }
 
-
-func ipCIDR(s string)([]string, error){
+func ipCIDR(s string) ([]string, error) {
 	ip, ipnet, err := net.ParseCIDR(s)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "")
 	}
 
 	var ips []string

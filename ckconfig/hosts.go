@@ -5,7 +5,7 @@ import (
 	"github.com/housepower/ckman/model"
 )
 
-func GenerateHostXML(filename string, conf *model.CKManClickHouseConfig, host string)(string, error){
+func GenerateHostXML(filename string, conf *model.CKManClickHouseConfig, host string) (string, error) {
 	shardIndex := 0
 	for i, shard := range conf.Shards {
 		for _, replica := range shard.Replicas {

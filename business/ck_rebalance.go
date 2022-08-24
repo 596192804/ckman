@@ -3,15 +3,16 @@ package business
 import (
 	"database/sql"
 	"fmt"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+
 	"github.com/housepower/ckman/common"
 	"github.com/housepower/ckman/log"
 	"github.com/housepower/ckman/model"
 	"github.com/k0kubun/pp"
 	"github.com/pkg/errors"
-	"path/filepath"
-	"sort"
-	"strings"
-	"sync"
 )
 
 var (
@@ -31,7 +32,6 @@ type CKRebalance struct {
 	OsUser     string
 	OsPassword string
 	OsPort     int
-	Pool       *common.WorkerPool
 }
 
 // TblPartitions is partitions status of a host. A host never move out and move in at the same iteration.
@@ -50,7 +50,6 @@ func (this *CKRebalance) InitCKConns() (err error) {
 	for _, host := range this.Hosts {
 		_, err = common.ConnectClickHouse(host, this.Port, model.ClickHouseDefaultDB, this.User, this.Password)
 		if err != nil {
-			err = errors.Wrapf(err, "")
 			return
 		}
 		log.Logger.Infof("initialized clickhouse connection to %s", host)
@@ -66,7 +65,6 @@ func (this *CKRebalance) GetTables() (err error) {
 		return fmt.Errorf("can't get connection: %s", host)
 	}
 	if this.Databases, this.DBTables, err = common.GetMergeTreeTables("MergeTree", db); err != nil {
-		err = errors.Wrapf(err, "")
 		return
 	}
 	return
@@ -113,9 +111,16 @@ func (this *CKRebalance) InitSshConns(database string) (err error) {
 			}
 			cmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=false %s ls %s/clickhouse/data/%s", dstHost, this.DataDir, database)
 			log.Logger.Infof("host: %s, command: %s", srcHost, cmd)
+			sshOpts := common.SshOptions{
+				User:             this.OsUser,
+				Password:         this.OsPassword,
+				Port:             this.OsPort,
+				Host:             srcHost,
+				NeedSudo:         true,
+				AuthenticateType: model.SshPasswordSave,
+			}
 			var out string
-			if out, err = common.RemoteExecute(this.OsUser, this.OsPassword, srcHost, this.OsPort, cmd); err != nil {
-				err = errors.Wrapf(err, "output: %s", out)
+			if out, err = common.RemoteExecute(sshOpts, cmd); err != nil {
 				return
 			}
 			log.Logger.Debugf("host: %s, output: %s", srcHost, out)
@@ -218,7 +223,7 @@ func (this *CKRebalance) ExecutePlan(database string, tbl *TblPartitions) (err e
 
 			// There could be multiple executions on the same dest node and partition.
 			lock.Lock()
-			dstChConn  := common.GetConnection(dstHost)
+			dstChConn := common.GetConnection(dstHost)
 			if dstChConn == nil {
 				return fmt.Errorf("can't get connection: %s", dstHost)
 			}
@@ -278,9 +283,16 @@ func (this *CKRebalance) ExecutePlan(database string, tbl *TblPartitions) (err e
 			fmt.Sprintf(`rsync -e "ssh -o StrictHostKeyChecking=false" -avp %s %s:%s`, srcDir, dstHost, dstDir),
 			fmt.Sprintf("rm -fr %s", srcDir),
 		}
+		sshOpts := common.SshOptions{
+			User:             this.OsUser,
+			Password:         this.OsPassword,
+			Port:             this.OsPort,
+			Host:             tbl.Host,
+			NeedSudo:         true,
+			AuthenticateType: model.SshPasswordSave,
+		}
 		var out string
-		if out, err = common.RemoteExecute(this.OsUser, this.OsPassword, tbl.Host, this.OsPort, strings.Join(cmds, ";")); err != nil {
-			err = errors.Wrapf(err, "output: %s", out)
+		if out, err = common.RemoteExecute(sshOpts, strings.Join(cmds, ";")); err != nil {
 			lock.Unlock()
 			return
 		}
@@ -306,7 +318,6 @@ func (this *CKRebalance) ExecutePlan(database string, tbl *TblPartitions) (err e
 }
 
 func (this *CKRebalance) DoRebalance() (err error) {
-	this.Pool = common.NewWorkerPool(common.MaxWorkersDefault,  2*common.MaxWorkersDefault)
 	for _, database := range this.Databases {
 		tables := this.DBTables[database]
 		for _, table := range tables {
@@ -330,7 +341,7 @@ func (this *CKRebalance) DoRebalance() (err error) {
 			var gotError bool
 			for i := 0; i < len(tbls); i++ {
 				tbl := tbls[i]
-				_ = this.Pool.Submit(func() {
+				_ = common.Pool.Submit(func() {
 					if err := this.ExecutePlan(database, tbl); err != nil {
 						log.Logger.Errorf("host: %s, got error %+v", tbl.Host, err)
 						gotError = true
@@ -339,7 +350,7 @@ func (this *CKRebalance) DoRebalance() (err error) {
 					}
 				})
 			}
-			this.Pool.Wait()
+			common.Pool.Wait()
 			if gotError {
 				return err
 			}

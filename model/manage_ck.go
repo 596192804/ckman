@@ -7,6 +7,7 @@ const (
 )
 
 type CkClusterInfoRsp struct {
+	PkgType      string          `json:"pkgType"`
 	Status       string          `json:"status"`
 	Version      string          `json:"version"`
 	Nodes        []CkClusterNode `json:"nodes"`
@@ -21,6 +22,7 @@ type CkClusterNode struct {
 	ShardNumber   int    `json:"shardNumber"`
 	ReplicaNumber int    `json:"replicaNumber"`
 	Disk          string `json:"disk"`
+	Uptime        string `json:"uptime"`
 }
 
 type AddNodeReq struct {
@@ -28,8 +30,13 @@ type AddNodeReq struct {
 	Shard int      `json:"shard" example:"3"`
 }
 
+type GetLogReq struct {
+	LogType string `json:"logType" example:"normal"`
+	Lines   uint16 `json:"lines" example:"1000"`
+	Tail    bool   `json:"tail" example:"true"`
+}
+
 type PingClusterReq struct {
-	Database string `json:"database" example:"default"`
 	User     string `json:"user" example:"ck"`
 	Password string `json:"password" example:"123456"`
 }

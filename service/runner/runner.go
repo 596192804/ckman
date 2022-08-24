@@ -1,14 +1,15 @@
 package runner
 
 import (
+	"runtime/debug"
+	"time"
+
 	"github.com/housepower/ckman/common"
 	"github.com/housepower/ckman/config"
 	"github.com/housepower/ckman/deploy"
 	"github.com/housepower/ckman/log"
 	"github.com/housepower/ckman/model"
 	"github.com/housepower/ckman/repository"
-	"runtime/debug"
-	"time"
 )
 
 type RunnerService struct {
@@ -85,6 +86,7 @@ func (runner *RunnerService) ProcesswithTaskType(task model.Task) error {
 }
 
 func (runner *RunnerService) Stop() {
+	runner.Pool.Close()
 	if checkDone() {
 		log.Logger.Infof("all task are finished, exit gracefully")
 		runner.Shutdown()
@@ -107,6 +109,14 @@ func (runner *RunnerService) Stop() {
 			}
 		case <-timeout.C:
 			log.Logger.Warnf("time out waiting for task running, ignore and force exit.")
+			tasks, _ := repository.Ps.GetAllTasks()
+			for _, task := range tasks {
+				if task.Status == model.TaskStatusRunning {
+					task.Status = model.TaskStatusStopped
+					repository.Ps.UpdateTask(task)
+				}
+			}
+
 			runner.Shutdown()
 			return
 		}

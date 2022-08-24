@@ -3,13 +3,17 @@ package mysql
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/housepower/ckman/common"
 	"github.com/housepower/ckman/log"
 	"github.com/housepower/ckman/model"
 	"github.com/housepower/ckman/repository"
+	"github.com/pkg/errors"
 	driver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"strings"
-	"time"
+	"moul.io/zapgorm2"
 )
 
 type MysqlPersistent struct {
@@ -32,13 +36,17 @@ func (mp *MysqlPersistent) Init(config interface{}) error {
 		mp.Config.DataBase)
 
 	log.Logger.Debugf("mysql dsn:%s", dsn)
-	db, err := gorm.Open(driver.Open(dsn), &gorm.Config{})
+	logger := zapgorm2.New(log.ZapLog)
+	logger.SetAsDefault()
+	db, err := gorm.Open(driver.Open(dsn), &gorm.Config{
+		Logger: logger,
+	})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	// set connection pool
@@ -59,7 +67,7 @@ func (mp *MysqlPersistent) Init(config interface{}) error {
 		&TblTask{},
 	)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	mp.Client.Set("table_options", "ENGINE=InnoDB CHARSET=utf8mb4")
 	return nil
@@ -122,7 +130,7 @@ func (mp *MysqlPersistent) GetClusterbyName(cluster string) (model.CKManClickHou
 		return model.CKManClickHouseConfig{}, wrapError(tx.Error)
 	}
 	if err := json.Unmarshal([]byte(table.Config), &conf); err != nil {
-		return model.CKManClickHouseConfig{}, err
+		return model.CKManClickHouseConfig{}, errors.Wrap(err, "")
 	}
 	repository.DecodePasswd(&conf)
 	return conf, nil
@@ -135,7 +143,7 @@ func (mp *MysqlPersistent) GetLogicClusterbyName(logic string) ([]string, error)
 		return []string{}, wrapError(tx.Error)
 	}
 	physics := strings.Split(table.PhysicClusters, ",")
-	return physics, nil
+	return common.ArrayDistinct(physics), nil
 }
 
 func (mp *MysqlPersistent) GetAllClusters() (map[string]model.CKManClickHouseConfig, error) {
@@ -143,12 +151,12 @@ func (mp *MysqlPersistent) GetAllClusters() (map[string]model.CKManClickHouseCon
 	clusterMapping := make(map[string]model.CKManClickHouseConfig)
 	tx := mp.Client.Find(&tables)
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
-		return nil, tx.Error
+		return nil, errors.Wrap(tx.Error, "")
 	}
 	for _, table := range tables {
 		var conf model.CKManClickHouseConfig
 		if err := json.Unmarshal([]byte(table.Config), &conf); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "")
 		}
 		repository.DecodePasswd(&conf)
 		clusterMapping[table.ClusterName] = conf
@@ -161,11 +169,11 @@ func (mp *MysqlPersistent) GetAllLogicClusters() (map[string][]string, error) {
 	logicMapping := make(map[string][]string)
 	tx := mp.Client.Find(&tables)
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
-		return nil, tx.Error
+		return nil, errors.Wrap(tx.Error, "")
 	}
 	for _, table := range tables {
 		physics := strings.Split(table.PhysicClusters, ",")
-		logicMapping[table.LogicCluster] = physics
+		logicMapping[table.LogicCluster] = common.ArrayDistinct(physics)
 	}
 	return logicMapping, nil
 }
@@ -178,7 +186,7 @@ func (mp *MysqlPersistent) CreateCluster(conf model.CKManClickHouseConfig) error
 	repository.EncodePasswd(&conf)
 	config, err := json.Marshal(conf)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	table := TblCluster{
 		ClusterName: conf.Cluster,
@@ -195,7 +203,7 @@ func (mp *MysqlPersistent) CreateLogicCluster(logic string, physics []string) er
 	}
 	table := TblLogic{
 		LogicCluster:   logic,
-		PhysicClusters: strings.Join(physics, ","),
+		PhysicClusters: strings.Join(common.ArrayDistinct(physics), ","),
 	}
 	tx := mp.Client.Create(&table)
 	return wrapError(tx.Error)
@@ -210,7 +218,7 @@ func (mp *MysqlPersistent) UpdateCluster(conf model.CKManClickHouseConfig) error
 	repository.EncodePasswd(&conf)
 	config, err := json.Marshal(conf)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	table := TblCluster{
 		ClusterName: conf.Cluster,
@@ -227,7 +235,7 @@ func (mp *MysqlPersistent) UpdateLogicCluster(logic string, physics []string) er
 	}
 	table := TblLogic{
 		LogicCluster:   logic,
-		PhysicClusters: strings.Join(physics, ","),
+		PhysicClusters: strings.Join(common.ArrayDistinct(physics), ","),
 	}
 	tx := mp.Client.Model(TblLogic{}).Where("logic_name = ?", logic).Updates(&table)
 	return wrapError(tx.Error)
@@ -248,7 +256,7 @@ func (mp *MysqlPersistent) GetAllQueryHistory() (map[string]model.QueryHistory, 
 	historys := make(map[string]model.QueryHistory)
 	tx := mp.Client.Find(&tables)
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
-		return nil, tx.Error
+		return nil, errors.Wrap(tx.Error, "")
 	}
 	for _, table := range tables {
 		history := model.QueryHistory{
@@ -266,7 +274,7 @@ func (mp *MysqlPersistent) GetQueryHistoryByCluster(cluster string) ([]model.Que
 	var tables []TblQueryHistory
 	tx := mp.Client.Where("cluster = ?", cluster).Order("create_time DESC").Limit(100).Find(&tables)
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
-		return nil, tx.Error
+		return nil, errors.Wrap(tx.Error, "")
 	}
 	var historys []model.QueryHistory
 	for _, table := range tables {
@@ -350,7 +358,7 @@ func (mp *MysqlPersistent) GetEarliestQuery() (model.QueryHistory, error) {
 func (mp *MysqlPersistent) CreateTask(task model.Task) error {
 	config, err := json.Marshal(task)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	table := TblTask{
@@ -366,9 +374,10 @@ func (mp *MysqlPersistent) CreateTask(task model.Task) error {
 }
 
 func (mp *MysqlPersistent) UpdateTask(task model.Task) error {
+	task.UpdateTime = time.Now()
 	config, err := json.Marshal(task)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	table := TblTask{
 		TaskId: task.TaskId,
@@ -386,8 +395,8 @@ func (mp *MysqlPersistent) DeleteTask(id string) error {
 
 func (mp *MysqlPersistent) GetAllTasks() ([]model.Task, error) {
 	var tables []TblTask
-	tx := mp.Client.Find(&tables).Order("status")
-	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+	tx := mp.Client.Find(&tables)
+	if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return nil, tx.Error
 	}
 	var tasks []model.Task
@@ -415,14 +424,14 @@ func (mp *MysqlPersistent) GetPengdingTasks(serverIp string) ([]model.Task, erro
 	var tables []TblTask
 	tx := mp.Client.Where("status = ?", model.TaskStatusWaiting).Find(&tables)
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
-		return nil, tx.Error
+		return nil, errors.Wrap(tx.Error, "")
 	}
 	var tasks []model.Task
 	var err error
 	for _, table := range tables {
 		var task model.Task
 		if err = json.Unmarshal([]byte(table.Task), &task); err != nil {
-			return []model.Task{}, err
+			return []model.Task{}, errors.Wrap(err, "")
 		}
 		if task.ServerIp == serverIp {
 			tasks = append(tasks, task)
@@ -439,14 +448,14 @@ func (mp *MysqlPersistent) GetTaskbyTaskId(id string) (model.Task, error) {
 	}
 	var task model.Task
 	if err := json.Unmarshal([]byte(table.Task), &task); err != nil {
-		return model.Task{}, err
+		return model.Task{}, errors.Wrap(err, "")
 	}
 
 	return task, nil
 }
 
 func wrapError(err error) error {
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		err = repository.ErrRecordNotFound
 	}
 	return err

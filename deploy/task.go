@@ -2,17 +2,19 @@ package deploy
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/go-basic/uuid"
 	"github.com/housepower/ckman/common"
 	"github.com/housepower/ckman/log"
 	"github.com/housepower/ckman/model"
 	"github.com/housepower/ckman/repository"
-	"time"
+	"github.com/pkg/errors"
 )
 
 func CreateNewTask(clusterName, taskType string, deploy interface{}) (string, error) {
-	if hasEffectiveTasks(clusterName) {
-		err := fmt.Errorf("create task failed, cluster %s has another task already running", clusterName)
+	if HasEffectiveTasks(clusterName) {
+		err := errors.Errorf("create task failed, cluster %s has another task already running", clusterName)
 		return "", err
 	}
 
@@ -56,13 +58,13 @@ func CreateNewTask(clusterName, taskType string, deploy interface{}) (string, er
 	return task.TaskId, nil
 }
 
-func hasEffectiveTasks(clusterName string) bool {
+func HasEffectiveTasks(clusterName string) bool {
 	tasks, err := repository.Ps.GetAllTasks()
 	if err != nil {
 		return false
 	}
 	for _, task := range tasks {
-		if task.Status == model.TaskStatusFailed || task.Status == model.TaskStatusSuccess {
+		if task.Status == model.TaskStatusFailed || task.Status == model.TaskStatusSuccess || task.Status == model.TaskStatusStopped {
 			continue
 		}
 		if clusterName == task.ClusterName {

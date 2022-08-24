@@ -5,7 +5,7 @@ import (
 	"github.com/housepower/ckman/model"
 )
 
-func GenerateMetrikaXML(filename string, conf *model.CKManClickHouseConfig)(string, error){
+func GenerateMetrikaXML(filename string, conf *model.CKManClickHouseConfig) (string, error) {
 	xml := common.NewXmlFile(filename)
 	xml.Begin("yandex")
 	xml.Append(GenZookeeperMetrika(xml.GetIndent(), conf))
@@ -20,7 +20,7 @@ func GenerateMetrikaXML(filename string, conf *model.CKManClickHouseConfig)(stri
 	return filename, nil
 }
 
-func GenerateMetrikaXMLwithLogic(filename string, conf *model.CKManClickHouseConfig, logicMrtrika string)(string, error){
+func GenerateMetrikaXMLwithLogic(filename string, conf *model.CKManClickHouseConfig, logicMrtrika string) (string, error) {
 	xml := common.NewXmlFile(filename)
 	xml.Begin("yandex")
 	xml.Append(GenZookeeperMetrika(xml.GetIndent(), conf))
@@ -41,7 +41,7 @@ func GenZookeeperMetrika(indent int, conf *model.CKManClickHouseConfig) string {
 	xml.SetIndent(indent)
 	xml.Begin("zookeeper")
 	for index, zk := range conf.ZkNodes {
-		xml.BeginwithAttr("node",  []common.XMLAttr{{Key: "index", Value:index+1}})
+		xml.BeginwithAttr("node", []common.XMLAttr{{Key: "index", Value: index + 1}})
 		xml.Write("host", zk)
 		xml.Write("port", conf.ZkPort)
 		xml.End("node")
@@ -50,12 +50,12 @@ func GenZookeeperMetrika(indent int, conf *model.CKManClickHouseConfig) string {
 	return xml.GetContext()
 }
 
-func GenLocalMetrika(indent int, conf *model.CKManClickHouseConfig)string {
+func GenLocalMetrika(indent int, conf *model.CKManClickHouseConfig) string {
 	xml := common.NewXmlFile("")
 	xml.SetIndent(indent)
 	xml.Begin(conf.Cluster)
 	secret := true
-	if common.CompareClickHouseVersion(conf.Version, "20.10.3.30") < 0{
+	if common.CompareClickHouseVersion(conf.Version, "20.10.3.30") < 0 {
 		secret = false
 	}
 	if secret {
@@ -98,4 +98,3 @@ func GenLocalMetrika(indent int, conf *model.CKManClickHouseConfig)string {
 	xml.End(conf.Cluster)
 	return xml.GetContext()
 }
-

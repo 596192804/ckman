@@ -1,14 +1,12 @@
 package model
 
+import (
+	"strings"
+)
+
 const (
-	CkClusterImport       string = "import"
-	CkClusterDeploy       string = "deploy"
-	CkClientPackagePrefix string = "clickhouse-client"
-	CkClientPackageSuffix string = "2.noarch.rpm"
-	CkCommonPackagePrefix string = "clickhouse-common-static"
-	CkCommonPackageSuffix string = "2.x86_64.rpm"
-	CkServerPackagePrefix string = "clickhouse-server"
-	CkServerPackageSuffix string = "2.noarch.rpm"
+	CkClusterImport string = "import"
+	CkClusterDeploy string = "deploy"
 
 	ClickHouseDefaultDB          string = "default"
 	ClickHouseDefaultUser        string = "default"
@@ -19,6 +17,7 @@ const (
 	SshDefaultPort               int    = 22
 	PromHostDefault              string = "127.0.0.1"
 	PromPortDefault              int    = 9090
+	PkgTypeDefault               string = "x86_64.rpm"
 	ClickHouseUserProfileDefault string = "default"
 	ClickHouseUserQuotaDefault   string = "default"
 	ClickHouseUserNetIpDefault   string = "::/0"
@@ -31,9 +30,9 @@ const (
 )
 
 type CkDeployExt struct {
-	UpgradePolicy  string
-	Ipv6Enable     bool
-	Restart        bool
+	UpgradePolicy string
+	Ipv6Enable    bool
+	Restart       bool
 }
 
 type CkShard struct {
@@ -43,6 +42,7 @@ type CkShard struct {
 type CkReplica struct {
 	Ip       string `json:"ip" example:"192.168.101.105"`
 	HostName string `json:"hostname" swaggerignore:"true"`
+	Watch    bool   `json:"watch" swaggerignore:"true"`
 }
 
 type CkImportConfig struct {
@@ -61,8 +61,11 @@ type CkImportConfig struct {
 }
 
 type CKManClickHouseConfig struct {
-	Version          string    `json:"version" example:"21.9.1.7647"`
 	Cluster          string    `json:"cluster" example:"test"`
+	PkgType          string    `json:"pkgType" example:"x86_64.rpm"`
+	PkgName          string    `json:"pkgName" example:"clickhouse-common-static-22.3.3.44.noarch.rpm"`
+	Version          string    `json:"version" example:"21.9.1.7647"`
+	Cwd              string    `json:"cwd" example:"/home/eoi/clickhouse"`
 	LogicCluster     *string   `json:"logic_cluster" yaml:"logic_cluster" example:"logic_test"`
 	Port             int       `json:"port" example:"9000"`
 	IsReplica        bool      `json:"isReplica" example:"true"`
@@ -81,17 +84,14 @@ type CKManClickHouseConfig struct {
 	SshPassword      string    `json:"sshPassword" example:"123456"`
 	SshPort          int       `json:"sshPort" example:"22"`
 	Storage          *Storage
-	MergeTreeConf    *MergeTreeConf
 	UsersConf        UsersConf `swaggerignore:"true"`
+	Expert           map[string]string
 
 	// don't need to regist to schema
 	Mode     string            `json:"mode" swaggerignore:"true"`
 	HttpPort int               `json:"httpPort" swaggerignore:"true"`
 	ZooPath  map[string]string `json:"zooPath" swaggerignore:"true"`
-}
-
-type MergeTreeConf struct {
-	Expert map[string]string
+	NeedSudo bool              `json:"needSudo" swaggerignore:"true"`
 }
 
 // Refers to https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes
@@ -145,11 +145,13 @@ type UsersConf struct {
 	Users    []User
 	Profiles []Profile
 	Quotas   []Quota
+	Expert   map[string]string
 }
 
 type User struct {
 	Name         string
 	Password     string
+	EncryptType  int
 	Profile      string        // shall be in Profiles
 	Quota        string        // shall be in Quotas
 	Networks     Networks      // List of networks from which the user can connect to the ClickHouse server.
@@ -176,12 +178,12 @@ type TblRowPolicy struct {
 type Profile struct {
 	Name string
 	// https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/
-	ReadOnly   *int
-	AllowDDL   *int
-	MaxThreads *int
+	ReadOnly   int
+	AllowDDL   int
+	MaxThreads int
 	// https://clickhouse.tech/docs/en/operations/settings/query-complexity/
-	MaxMemoryUsage              *int64
-	MaxMemoryUsageForAllQueries *int64
+	MaxMemoryUsage              int64
+	MaxMemoryUsageForAllQueries int64
 	Expert                      map[string]string
 }
 
@@ -223,5 +225,43 @@ func (config *CKManClickHouseConfig) Normalize() {
 	}
 	if config.PromPort == 0 {
 		config.PromPort = PromPortDefault
+	}
+
+	if config.PkgType == "" {
+		config.PkgType = PkgTypeDefault
+	}
+
+	if !strings.HasSuffix(config.PkgType, "tgz") {
+		config.Cwd = ""
+	}
+
+	if config.Cwd == "" {
+		config.NeedSudo = true
+	}
+}
+
+func (config *CKManClickHouseConfig) Watch(host string) {
+	if !strings.Contains(config.PkgType, "tgz") {
+		return
+	}
+	for i, shard := range config.Shards {
+		for j, replica := range shard.Replicas {
+			if host == ALL_NODES_DEFAULT || host == replica.Ip {
+				config.Shards[i].Replicas[j].Watch = true
+			}
+		}
+	}
+}
+
+func (config *CKManClickHouseConfig) UnWatch(host string) {
+	if !strings.Contains(config.PkgType, "tgz") {
+		return
+	}
+	for i, shard := range config.Shards {
+		for j, replica := range shard.Replicas {
+			if host == ALL_NODES_DEFAULT || host == replica.Ip {
+				config.Shards[i].Replicas[j].Watch = false
+			}
+		}
 	}
 }

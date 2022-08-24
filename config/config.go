@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pkg/errors"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,17 +22,23 @@ type ClusterNode struct {
 	Port int    `json:"port"`
 }
 
+type CronJob struct {
+	SyncLogicSchema    string `yaml:"sync_logic_schema"`
+	WatchClusterStatus string `yaml:"watch_cluster_status"`
+	SyncDistSchema     string `yaml:"sync_dist_schema"`
+}
+
 type CKManConfig struct {
 	ConfigFile       string `yaml:"-"`
 	Server           CKManServerConfig
 	Log              CKManLogConfig
 	PersistentConfig map[string]map[string]interface{} `yaml:"persistent_config"`
 	Nacos            CKManNacosConfig
+	Cron             CronJob
 	Version          string `yaml:"-"`
 }
 
 type CKManServerConfig struct {
-	Id               int
 	Bind             string
 	Ip               string
 	Port             int
@@ -89,13 +97,13 @@ func fillDefault(c *CKManConfig) {
 func ParseConfigFile(path, version string) error {
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	defer f.Close()
 
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	GlobalConfig.ConfigFile = path
@@ -104,7 +112,7 @@ func ParseConfigFile(path, version string) error {
 	fillDefault(&GlobalConfig)
 	err = yaml.Unmarshal(data, &GlobalConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	return nil
 }
@@ -112,17 +120,17 @@ func ParseConfigFile(path, version string) error {
 func MarshConfigFile() error {
 	out, err := yaml.Marshal(GlobalConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	localFd, err := os.OpenFile(GlobalConfig.ConfigFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	defer localFd.Close()
 
-	if _, err := localFd.Write(out); err != nil {
-		return err
+	if _, err = localFd.Write(out); err != nil {
+		return errors.Wrap(err, "")
 	}
 
 	return nil
@@ -140,6 +148,8 @@ func GetWorkDirectory() string {
 func GetClusterPeers() []ClusterNode {
 	list := make([]ClusterNode, 0)
 
+	ClusterMutex.RLock()
+	defer ClusterMutex.RUnlock()
 	for index, node := range ClusterNodes {
 		if GlobalConfig.Server.Ip != node.Ip && GlobalConfig.Server.Port != node.Port {
 			list = append(list, ClusterNodes[index])
@@ -147,4 +157,18 @@ func GetClusterPeers() []ClusterNode {
 	}
 
 	return list
+}
+
+func IsMasterNode() bool {
+	//if disabled nacos, always consider the current node to be the master node
+	if !GlobalConfig.Nacos.Enabled {
+		return true
+	}
+	ClusterMutex.RLock()
+	defer ClusterMutex.RUnlock()
+	if len(ClusterNodes) == 0 {
+		return false
+	}
+	master := ClusterNodes[0]
+	return master.Ip == GlobalConfig.Server.Ip && master.Port == GlobalConfig.Server.Port
 }

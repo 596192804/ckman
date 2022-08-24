@@ -2,12 +2,14 @@ package zookeeper
 
 import (
 	"fmt"
-	"github.com/housepower/ckman/repository"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/housepower/ckman/common"
+	"github.com/housepower/ckman/repository"
 
 	"github.com/go-zookeeper/zk"
 	"github.com/housepower/ckman/model"
@@ -38,7 +40,7 @@ func NewZkService(nodes []string, port int) (*ZkService, error) {
 
 	c, e, err := zk.Connect(servers, time.Second)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "")
 	}
 
 	zkService.Conn = c
@@ -67,6 +69,9 @@ func GetZkService(clusterName string) (*ZkService, error) {
 }
 
 func (z *ZkService) GetReplicatedTableStatus(conf *model.CKManClickHouseConfig) ([]model.ZkReplicatedTableStatus, error) {
+	if !conf.IsReplica {
+		return nil, nil
+	}
 	err := clickhouse.GetReplicaZkPath(conf)
 	if err != nil {
 		return nil, err
@@ -106,15 +111,21 @@ func (z *ZkService) GetReplicatedTableStatus(conf *model.CKManClickHouseConfig) 
 			leader := strings.Split(string(leaderBytes), " ")[0]
 
 			for replicaIndex, replica := range shard.Replicas {
+				// the clickhouse version 20.5.x already Remove leader election, refer to : allow multiple leaders https://github.com/ClickHouse/ClickHouse/pull/11639
+				const featureVersion = "20.5.x"
 				logPointer := ""
-				if leader == replica.Ip {
-					logPointer = "L"
+				if common.CompareClickHouseVersion(conf.Version, featureVersion) >= 0 {
+					logPointer = "ML"
 				} else {
-					logPointer = "F"
+					if leader == replica.Ip {
+						logPointer = "L"
+					} else {
+						logPointer = "F"
+					}
 				}
 				path = fmt.Sprintf("%s/replicas/%s/log_pointer", zooPath, replica.Ip)
 				pointer, _, _ := z.Conn.Get(path)
-				logPointer = logPointer + string(pointer)
+				logPointer = logPointer + fmt.Sprintf("[%s]", pointer)
 				replicas[replicaIndex] = logPointer
 			}
 		}
@@ -126,7 +137,7 @@ func (z *ZkService) GetReplicatedTableStatus(conf *model.CKManClickHouseConfig) 
 
 func (z *ZkService) DeleteAll(node string) (err error) {
 	children, stat, err := z.Conn.Children(node)
-	if err == zk.ErrNoNode {
+	if errors.Is(err, zk.ErrNoNode) {
 		return nil
 	} else if err != nil {
 		err = errors.Wrap(err, "delete zk node: ")

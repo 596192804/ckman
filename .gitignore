@@ -2,9 +2,11 @@ ckman
 test/*
 vendor/*
 *.rpm
+*.deb
 *.tar.gz
 .DS_Store
 .idea/
+.vscode/
 coverage.out
 coverage-all.out
 cscope.*
@@ -15,4 +17,5 @@ rebalancer
 schemer
 migrate
 pkged.go
+static/dist/
 resources/eoi_public_key.pub

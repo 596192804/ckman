@@ -3,11 +3,11 @@ package common
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"errors"
 	"io"
 	"math/big"
-)
 
+	"github.com/pkg/errors"
+)
 
 var (
 	ErrDataToLarge     = errors.New("message too long for RSA public key size")
@@ -19,10 +19,9 @@ var (
 	ErrPrivateKey      = errors.New("get private key error")
 )
 
-
 var (
 	bigZero = big.NewInt(0)
-	bigOne = big.NewInt(1)
+	bigOne  = big.NewInt(1)
 )
 
 func pubKeyIO(pub *rsa.PublicKey, in io.Reader, out io.Writer, isEncrytp bool) (err error) {
@@ -52,10 +51,10 @@ func pubKeyIO(pub *rsa.PublicKey, in io.Reader, out io.Writer, isEncrytp bool) (
 			b, err = pubKeyDecrypt(pub, b)
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, "")
 		}
 		if _, err = out.Write(b); err != nil {
-			return err
+			return errors.Wrap(err, "")
 		}
 	}
 }
@@ -74,7 +73,7 @@ func priKeyIO(pri *rsa.PrivateKey, r io.Reader, w io.Writer, isEncrytp bool) (er
 			if err == io.EOF {
 				return nil
 			}
-			return err
+			return errors.Wrap(err, "")
 		}
 		if size < k {
 			b = buf[:size]
@@ -87,10 +86,10 @@ func priKeyIO(pri *rsa.PrivateKey, r io.Reader, w io.Writer, isEncrytp bool) (er
 			b, err = rsa.DecryptPKCS1v15(rand.Reader, pri, b)
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, "")
 		}
 		if _, err = w.Write(b); err != nil {
-			return err
+			return errors.Wrap(err, "")
 		}
 	}
 }
@@ -218,7 +217,6 @@ func copyWithLeftPad(dest, src []byte) {
 	}
 	copy(dest[numPaddingBytes:], src)
 }
-
 
 func leftPad(input []byte, size int) (out []byte) {
 	n := len(input)

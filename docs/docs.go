@@ -116,7 +116,7 @@ var doc = `{
                 "summary": "Get config of all ClickHouse cluster",
                 "responses": {
                     "200": {
-                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\", \"entity\":{\"test\":{\"mode\":\"import\",\"hosts\":[\"192.168.0.1\",\"192.168.0.2\",\"192.168.0.3\",\"192.168.0.4\"],\"names\":[\"node1\",\"node2\",\"node3\",\"node4\"],\"port\":9000,\"httpPort\":8123,\"user\":\"ck\",\"password\":\"123456\",\"database\":\"default\",\"cluster\":\"test\",\"zkNodes\":[\"192.168.0.1\",\"192.168.0.2\",\"192.168.0.3\"],\"zkPort\":2181,\"zkStatusPort\":8080,\"isReplica\":true,\"version\":\"20.8.5.45\",\"sshUser\":\"\",\"sshPassword\":\"\",\"shards\":[{\"replicas\":[{\"ip\":\"192.168.0.1\",\"hostname\":\"node1\"},{\"ip\":\"192.168.0.2\",\"hostname\":\"node2\"}]},{\"replicas\":[{\"ip\":\"192.168.0.3\",\"hostname\":\"node3\"},{\"ip\":\"192.168.0.4\",\"hostname\":\"node4\"}]}],\"path\":\"\"}}}",
+                        "description": "{\"retCode\":\"5065\",\"retMsg\":\"get ClickHouse cluster information failed\",\"entity\":null}",
                         "schema": {
                             "type": "string"
                         }
@@ -200,7 +200,7 @@ var doc = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\",\"entity\":null}",
+                        "description": "{\"retCode\":\"5045\",\"retMsg\":\"delete cluster failed\",\"entity\":\"\"}",
                         "schema": {
                             "type": "string"
                         }
@@ -420,6 +420,50 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/ck/node/log/{clusterName}": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get ClickHouse Log",
+                "summary": "GetLog",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "test",
+                        "description": "cluster name",
+                        "name": "clusterName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "request body",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.GetLogReq"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "password",
+                        "name": "password",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"success\",\"entity\":null}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ck/node/start/{clusterName}": {
             "put": {
                 "security": [
@@ -604,6 +648,69 @@ var doc = `{
                 "responses": {
                     "200": {
                         "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\",\"entity\":[{\"startTime\":1609997894,\"queryDuration\":1,\"query\":\"SELECT DISTINCT name FROM system.tables\",\"user\":\"eoi\",\"queryId\":\"62dce71d-9294-4e47-9d9b-cf298f73233d\",\"address\":\"192.168.21.73\",\"threads\":2}]}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Kill open sessions",
+                "summary": "Kill open sessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "test",
+                        "description": "cluster name",
+                        "name": "clusterName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "10",
+                        "description": "sessions limit",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\",\"entity\":[{\"startTime\":1609997894,\"queryDuration\":1,\"query\":\"SELECT DISTINCT name FROM system.tables\",\"user\":\"eoi\",\"queryId\":\"62dce71d-9294-4e47-9d9b-cf298f73233d\",\"address\":\"192.168.21.73\",\"threads\":2}]}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ck/partition/{clusterName}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "get partition infomation",
+                "summary": "GetPartitions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "test",
+                        "description": "cluster name",
+                        "name": "clusterName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\",\"entity\":\"\"}",
                         "schema": {
                             "type": "string"
                         }
@@ -956,6 +1063,73 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/ck/table/readoly/{clusterName}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "restore replica to  recover readonly",
+                "summary": "RestoreReplica",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "test",
+                        "description": "cluster name",
+                        "name": "clusterName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"retCode\":\"5003\",\"retMsg\":\"alter ClickHouse table failed\",\"entity\":\"\"}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ck/table/ttl/{clusterName}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Alter Tables TTL",
+                "summary": "AlterTableTTL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "test",
+                        "description": "cluster name",
+                        "name": "clusterName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "request body",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AlterCkTableReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"retCode\":\"5003\",\"retMsg\":\"alter ClickHouse table failed\",\"entity\":\"\"}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ck/table/{clusterName}": {
             "get": {
                 "security": [
@@ -1185,15 +1359,6 @@ var doc = `{
                 "summary": "show create table",
                 "parameters": [
                     {
-                        "description": "request body",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.ArchiveTableReq"
-                        }
-                    },
-                    {
                         "type": "string",
                         "default": "test",
                         "description": "cluster name",
@@ -1385,9 +1550,19 @@ var doc = `{
                 ],
                 "description": "Get package list",
                 "summary": "Get package list",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "all",
+                        "description": "pkgType",
+                        "name": "pkgType",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\",\"entity\":[\"20.8.5.45\"]}",
+                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\",\"entity\":[{\"version\":\"22.3.9.19\",\"pkgType\":\"x86_64.rpm\",\"pkgName\":\"clickhouse-common-static-22.3.9.19.x86_64.rpm\"}]}",
                         "schema": {
                             "type": "string"
                         }
@@ -1434,9 +1609,17 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "20.8.5.45",
+                        "default": "22.3.9.19",
                         "description": "package version",
                         "name": "packageVersion",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "x86_64.rpm",
+                        "description": "package type",
+                        "name": "pkgType",
                         "in": "query",
                         "required": true
                     }
@@ -1462,7 +1645,7 @@ var doc = `{
                 "summary": "TasksList",
                 "responses": {
                     "200": {
-                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"success\",\"entity\":nil}",
+                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"success\",\"entity\":[{\\\"TaskId\\\":\\\"608e9e83-715e-7448-a149-9bef33f38cfe\\\",\\\"ClusterName\\\":\\\"usertest\\\",\\\"Type\\\":\\\"clickhouse\\\",\\\"Option\\\":{\\\"ZH\\\":\\\"升级集群\\\",\\\"EN\\\":\\\"Upgrade\\\"},\\\"Status\\\":\\\"Success\\\",\\\"Message\\\":\\\"Success\\\",\\\"CreateTime\\\":\\\"2022-08-15T10:38:52.319504494+08:00\\\",\\\"UpdateTime\\\":\\\"2022-08-15T10:39:22.177215927+08:00\\\",\\\"Duration\\\":\\\"29s\\\"},{\\\"TaskId\\\":\\\"c6ee8843-36ba-4c88-94dd-0f226cdf8377\\\",\\\"ClusterName\\\":\\\"abc\\\",\\\"Type\\\":\\\"clickhouse\\\",\\\"Option\\\":{\\\"ZH\\\":\\\"设置集群\\\",\\\"EN\\\":\\\"Setting\\\"},\\\"Status\\\":\\\"Success\\\",\\\"Message\\\":\\\"Success\\\",\\\"CreateTime\\\":\\\"2022-08-09T14:28:00.697211511+08:00\\\",\\\"UpdateTime\\\":\\\"2022-08-09T14:28:59.887673161+08:00\\\",\\\"Duration\\\":\\\"59s\\\"}]}",
                         "schema": {
                             "type": "string"
                         }
@@ -1501,7 +1684,35 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "default": "608e9e83-715e-7448-a149-9bef33f38cfe",
                         "description": "task id",
+                        "name": "taskId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"success\",\"entity\":{\\\"TaskId\\\":\\\"608e9e83-715e-7448-a149-9bef33f38cfe\\\",\\\"ClusterName\\\":\\\"usertest\\\",\\\"Type\\\":\\\"clickhouse\\\",\\\"Option\\\":{\\\"ZH\\\":\\\"升级集群\\\",\\\"EN\\\":\\\"Upgrade\\\"},\\\"NodeStatus\\\":[{\\\"Host\\\":\\\"192.168.110.10\\\",\\\"Status\\\":{\\\"ZH\\\":\\\"上传安装包\\\",\\\"EN\\\":\\\"Prepare\\\"}},{\\\"Host\\\":\\\"192.168.110.12\\\",\\\"Status\\\":{\\\"ZH\\\":\\\"上传安装包\\\",\\\"EN\\\":\\\"Prepare\\\"}},{\\\"Host\\\":\\\"192.168.110.14\\\",\\\"Status\\\":{\\\"ZH\\\":\\\"上传安装包\\\",\\\"EN\\\":\\\"Prepare\\\"}}]}}",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "stop task by taskid",
+                "summary": "StopTask",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "608e9e83-715e-7448-a149-9bef33f38cfe",
+                        "description": "taskId",
                         "name": "taskId",
                         "in": "query",
                         "required": true
@@ -1522,11 +1733,21 @@ var doc = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get running task count",
-                "summary": "GetRunningTaskCount",
+                "description": "delete task by taskid",
+                "summary": "DeleteTask",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "608e9e83-715e-7448-a149-9bef33f38cfe",
+                        "description": "taskId",
+                        "name": "taskId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"success\",\"entity\":3}",
+                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"success\",\"entity\":nil}",
                         "schema": {
                             "type": "string"
                         }
@@ -1543,9 +1764,19 @@ var doc = `{
                 ],
                 "description": "Get ui schema",
                 "summary": "Get ui schema",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "deploy",
+                        "description": "type",
+                        "name": "type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "{\"retCode\":\"5206\",\"retMsg\":\"get schema ui failed\",\"entity\":nil}",
                         "schema": {
                             "type": "string"
                         }
@@ -1622,7 +1853,7 @@ var doc = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "{\"retCode\":\"0000\",\"retMsg\":\"ok\",\"entity\":[{\"host\":\"192.168.102.116\",\"version\":\"3.6.2\",\"server_state\":\"follower\",\"peer_state\":\"following - broadcast\",\"avg_latency\":0.4929,\"approximate_data_size\":141979,\"znode_count\":926}]}",
+                        "description": "{\"retCode\":\"5080\",\"retMsg\":\"get zk status fail\",\"entity\":null}",
                         "schema": {
                             "type": "string"
                         }
@@ -1683,14 +1914,11 @@ var doc = `{
                     "type": "string",
                     "example": "test_table"
                 },
-                "ttl": {
+                "rename": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/model.CkTableTTL"
+                        "$ref": "#/definitions/model.CkTableRename"
                     }
-                },
-                "ttl_type": {
-                    "type": "string"
                 }
             }
         },
@@ -1753,6 +1981,16 @@ var doc = `{
                     "type": "string",
                     "example": "test"
                 },
+                "cwd": {
+                    "type": "string",
+                    "example": "/home/eoi/clickhouse"
+                },
+                "expert": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "hosts": {
                     "type": "array",
                     "items": {
@@ -1773,9 +2011,6 @@ var doc = `{
                     "type": "string",
                     "example": "logic_test"
                 },
-                "mergeTreeConf": {
-                    "$ref": "#/definitions/model.MergeTreeConf"
-                },
                 "password": {
                     "type": "string",
                     "example": "123456"
@@ -1783,6 +2018,14 @@ var doc = `{
                 "path": {
                     "type": "string",
                     "example": "/var/lib/"
+                },
+                "pkgName": {
+                    "type": "string",
+                    "example": "clickhouse-common-static-22.3.3.44.noarch.rpm"
+                },
+                "pkgType": {
+                    "type": "string",
+                    "example": "x86_64.rpm"
                 },
                 "port": {
                     "type": "integer",
@@ -1938,11 +2181,16 @@ var doc = `{
                     "example": "age"
                 },
                 "options": {
-                    "description": "example:[\"DEFAULT now()\", \"CODEC(NONE)\"]",
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "DEFAULT now()",
+                        "CODEC(NONE)",
+                        "COMMENT",
+                        "年龄"
+                    ]
                 },
                 "type": {
                     "type": "string",
@@ -1964,23 +2212,41 @@ var doc = `{
                 }
             }
         },
+        "model.CkTableRename": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string",
+                    "example": "col_old"
+                },
+                "to": {
+                    "type": "string",
+                    "example": "col_new"
+                }
+            }
+        },
         "model.CkTableTTL": {
             "type": "object",
             "properties": {
                 "action": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "toVolume"
                 },
                 "interval": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 3
                 },
                 "target": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main"
                 },
                 "time_column": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "_timestamp"
                 },
                 "unit": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MONTH"
                 }
             }
         },
@@ -1989,7 +2255,7 @@ var doc = `{
             "properties": {
                 "packageVersion": {
                     "type": "string",
-                    "example": "20.9.3.45"
+                    "example": "22.3.6.5"
                 },
                 "policy": {
                     "type": "string",
@@ -2011,6 +2277,10 @@ var doc = `{
                 "distinct": {
                     "type": "boolean",
                     "example": true
+                },
+                "dryrun": {
+                    "type": "boolean",
+                    "example": false
                 },
                 "fields": {
                     "type": "array",
@@ -2035,7 +2305,8 @@ var doc = `{
                     "$ref": "#/definitions/model.CkTablePartition"
                 },
                 "storage_policy": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "external"
                 },
                 "ttl": {
                     "type": "array",
@@ -2083,6 +2354,23 @@ var doc = `{
                 }
             }
         },
+        "model.GetLogReq": {
+            "type": "object",
+            "properties": {
+                "lines": {
+                    "type": "integer",
+                    "example": 1000
+                },
+                "logType": {
+                    "type": "string",
+                    "example": "normal"
+                },
+                "tail": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "model.LoginReq": {
             "type": "object",
             "properties": {
@@ -2096,24 +2384,9 @@ var doc = `{
                 }
             }
         },
-        "model.MergeTreeConf": {
-            "type": "object",
-            "properties": {
-                "expert": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
         "model.PingClusterReq": {
             "type": "object",
             "properties": {
-                "database": {
-                    "type": "string",
-                    "example": "default"
-                },
                 "password": {
                     "type": "string",
                     "example": "123456"
